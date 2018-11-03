@@ -1,5 +1,8 @@
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{Dataset, SparkSession}
+import org.apache.spark.sql.functions._
 
+
+//Don't pay attention of red messages INFO (it's not an error)
 object Main extends App{
 
   val context = SparkSession
@@ -8,43 +11,31 @@ object Main extends App{
     .master("local")
     .getOrCreate()
 
-  // For implicit conversions like converting RDDs to DataFrames
-
-
+  //Put your own path to the json file
   var data = context.read.json("./data-students.json")
   //data.show()
   //data.printSchema()
 
   //Clean variable "network"
-  //Put values ​​with low occurrence in the other category
+  //Put values ​​with low occurrence (under 5000) in the 'Other' category
   val filterNetworkByOccurrence = data.groupBy("network").count()
-    .filter("count >= 500")
+    .filter("count < 5000")
     .sort("count")
+    //.show(200)
     .select("network")
     .collect()
-
-  import org.apache.spark.sql.functions._
-
   var updatedDf = data
+  //Todo Problem (foreach take only the last result may be try to replace it by map)
   filterNetworkByOccurrence.foreach(row =>{
     if(row.toString()!="[null]"){
-      updatedDf = data.withColumn("network", regexp_replace(col("network"), row(0).toString(), "amin"))
+      updatedDf = data.withColumn("network", when(col("network") === row(0).toString,"Other").otherwise(col("network")))
     }
   })
-  //updatedDf = data.withColumn("network", regexp_replace(col("network"), println(row(0)).toString, "amin"))
-  updatedDf.show(200)
+  //Todo problem : Should display only network with occurrences greater than 5000
+  updatedDf.groupBy("network").count()
+    .sort("count")
+    .show(200)
 
-
-  //val newsdf = data.withColumn("network", when(filterNetworkByOccurrence.contains(col("network")), "Other").otherwise(col("network")))
-
-  //data = data.toDF()
-
-  //val filtered = data.groupBy("network").count()
-  //val filter = filtered.filter(($"count" < 10320))
-
-    //.sort( $")count".desc).select("network").show(10,false)
-  //val newsdf = df.withColumn("network", when(deleteNetwork.contains(col("network")), "Other").otherwise(col("network")))
-  //newsdf.show()
 
 
 }
