@@ -13,3 +13,4 @@ project/plugins/project/
 .lib/
 .idea/
 data-students.json
+src/resources/data-students.json
