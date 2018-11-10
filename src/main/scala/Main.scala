@@ -1,8 +1,8 @@
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.ml.Pipeline
 import org.apache.spark.ml.feature.{StringIndexer,OneHotEncoder, VectorAssembler}
-import org.apache.spark.ml.classification.LogisticRegression
-
+import org.apache.spark.ml.classification.{LogisticRegression,BinaryLogisticRegressionSummary}
+import org.apache.spark.sql.functions.rand
 
 
 //Don't pay attention of red messages INFO (it's not an error)
@@ -16,6 +16,7 @@ object Main extends App{
     .appName("Word count")
     .master("local")
     .getOrCreate()
+
 
   
   //Put your own path to the json file
@@ -60,8 +61,6 @@ object Main extends App{
   // this is used to implicitly convert an RDD to a DataFrame.
   import org.apache.spark.sql.functions._
   val df = untreatedData.withColumn("label", when(col("label") === true, 1).otherwise(0))
-  //untreatedData.show()
-  //data.show()
 
     val colnames = df.schema.fields.map(col=> col.name)
 
@@ -91,11 +90,55 @@ object Main extends App{
   .setRegParam(0.3)
   .setElasticNetParam(0.8)
 
-  // Fit the model
-  val lrModel = lr.fit(dataModel)
-  // Print the coefficients and intercept for logistic regression
-  println(s"Coefficients: ${lrModel.coefficients} Intercept: ${lrModel.intercept}")
 
+  def splitDf(df: DataFrame) = {
+    val subsetLabelTrue = df.filter(col("label") === 1)
+    val subsetLabelFalse = df.filter(col("label") === 0)
+    val nTrain = df.count()*0.7
+    val nTest = df.count()*0.3
+    val training = subsetLabelTrue.orderBy(rand()).limit((nTrain*0.5).toInt).union(subsetLabelFalse.orderBy(rand()).limit((nTrain*0.5).toInt))
+    val test = subsetLabelTrue.orderBy(rand()).limit((nTest*0.5).toInt).union(subsetLabelFalse.orderBy(rand()).limit((nTest*0.5).toInt))
+    Array(training,test)
+  }
+
+  val splitData = splitDf(dataModel)
+
+  // Fit the model
+  val lrModel = lr.fit(splitData(0))
+
+  val predictions = lrModel.transform(splitData(1))
+
+
+  
+
+  // Print the coefficients and intercept for logistic regression
+val trainingSummary = lrModel.summary
+
+// Obtain the objective per iteration.
+val objectiveHistory = trainingSummary.objectiveHistory
+
+// Obtain the metrics useful to judge performance on test data.
+// We cast the summary to a BinaryLogisticRegressionSummary since the problem is a
+// binary classification problem.
+val binarySummary = trainingSummary.asInstanceOf[BinaryLogisticRegressionSummary]
+
+// Obtain the receiver-operating characteristic as a dataframe and areaUnderROC.
+val roc = binarySummary.roc
+
+println("***********************************************************************")
+println("objectiveHistory:")
+objectiveHistory.foreach(loss => println(loss))
+
+println("***********************************************************************")
+
+println(s"Coefficients: ${lrModel.coefficients} Intercept: ${lrModel.intercept}")
+
+println("***********************************************************************")
+
+roc.show()
+println(s"areaUnderROC: ${binarySummary.areaUnderROC}")
+
+println("***********************************************************************")
 
   context.stop()
 }
