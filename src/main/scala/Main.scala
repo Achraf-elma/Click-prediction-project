@@ -17,37 +17,14 @@ object Main extends App{
     .master("local")
     .getOrCreate()
 
-
+  context.sparkContext.setLogLevel("WARN")
   
   //Put your own path to the json file
-  val untreatedData = context.read.json("./src/resources/data-students.json").select("network","city","impid","exchange","media","os","type", "label")
+  //select your variable to add and change inside the variable columnVectorialized and dataModel at the end of the code 
+  val untreatedData = context.read.json("./src/resources/data-students.json").select("appOrSite"/*"network","city","impid","exchange","media","os","type"*/, "label")
 
 
-  val cleaner = new Cleaner()
-  val newData = cleanNetwork(untreatedData)
-  //newData.show()
 
-  /**
-    * Clean the column "network"
-    * @param data
-    * @return
-    */
-  def cleanNetwork(data: DataFrame): DataFrame = {
-    //Clean variable "network"
-    //Put values ​​with low occurrence (under 5000) in the 'Other' category
-    val networksWithNotEnoughOccurences = cleaner.selectValueFromGivenCount(data, "< 5000", "network");
-    val setOfNetworkToClassify: Set[String] = networksWithNotEnoughOccurences.map(x => x.toString()).toSet
-    val updatedDF = data.withColumn("networkClass", Cleaner.udf_check(setOfNetworkToClassify, "<5000")(data("network")))//.drop("network")
-    /*updatedDF.show()
-    updatedDF.filter("networkClass == '<5000'").show()*/
-
-    //Display only network with occurrences greater than or or equal to 5000
-    /*updatedDF.groupBy("network").count()
-      .sort("count >= 5000")
-      .select("network")
-      .show(200)*/
-    updatedDF
-  }
 
 
   //TODO: clean interests
@@ -79,16 +56,17 @@ object Main extends App{
     val pipeline = new Pipeline().setStages(indexers ++ encoders)
     val dfEncoded = pipeline.fit(df).transform(df)
 
+    //Add your variable inside the setInputCols by adding Encode after
     val columnVectorialized = new VectorAssembler()
-      .setInputCols(Array("networkEncode","cityEncode","impidEncode","exchangeEncode","mediaEncode","osEncode","typeEncode"))
+      .setInputCols(Array("appOrSiteEncode"/*networkEncode","cityEncode","impidEncode","exchangeEncode","mediaEncode","osEncode","typeEncode"*/))
       .setOutputCol("features")
 
-    val dataModel = columnVectorialized.transform(dfEncoded).select("networkEncode","cityEncode","impidEncode","exchangeEncode","mediaEncode","osEncode","typeEncode","label", "features")
+    val dataModel = columnVectorialized.transform(dfEncoded).select("appOrSiteEncode",/*networkEncode","cityEncode","impidEncode","exchangeEncode","mediaEncode","osEncode","typeEncode",*/"label", "features")
   
   val lr = new LogisticRegression()
   .setMaxIter(10)
-  .setRegParam(0.3)
-  .setElasticNetParam(0.8)
+  .setRegParam(0.1)
+  .setElasticNetParam(0.1)
 
 
   def splitDf(df: DataFrame) = {
@@ -105,6 +83,7 @@ object Main extends App{
 
   // Fit the model
   val lrModel = lr.fit(splitData(0))
+
 
   val predictions = lrModel.transform(splitData(1))
 
@@ -124,21 +103,13 @@ val binarySummary = trainingSummary.asInstanceOf[BinaryLogisticRegressionSummary
 
 // Obtain the receiver-operating characteristic as a dataframe and areaUnderROC.
 val roc = binarySummary.roc
-
-println("***********************************************************************")
-println("objectiveHistory:")
-objectiveHistory.foreach(loss => println(loss))
-
-println("***********************************************************************")
-
-println(s"Coefficients: ${lrModel.coefficients} Intercept: ${lrModel.intercept}")
-
-println("***********************************************************************")
-
 roc.show()
 println(s"areaUnderROC: ${binarySummary.areaUnderROC}")
 
-println("***********************************************************************")
+println("objectiveHistory:")
+objectiveHistory.foreach(loss => println(loss))
+
+println(s"Coefficients: ${lrModel.coefficients} Intercept: ${lrModel.intercept}")
 
   context.stop()
 }
