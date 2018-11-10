@@ -1,4 +1,8 @@
 import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.ml.Pipeline
+import org.apache.spark.ml.feature.{StringIndexer,OneHotEncoder, VectorAssembler}
+import org.apache.spark.ml.classification.LogisticRegression
+
 
 
 //Don't pay attention of red messages INFO (it's not an error)
@@ -13,11 +17,14 @@ object Main extends App{
     .master("local")
     .getOrCreate()
 
+  
   //Put your own path to the json file
-  val data = context.read.json("./src/resources/data-students.json")
+  val untreatedData = context.read.json("./src/resources/data-students.json").select("network","city","impid","exchange","media","os","type", "label")
+
+
   val cleaner = new Cleaner()
-  val newData = cleanNetwork(data)
-  newData.show()
+  val newData = cleanNetwork(untreatedData)
+  //newData.show()
 
   /**
     * Clean the column "network"
@@ -48,4 +55,47 @@ object Main extends App{
   //updateInterestsArray.show()
   //updateInterests.select("interests").show()
 
+
+
+  // this is used to implicitly convert an RDD to a DataFrame.
+  import org.apache.spark.sql.functions._
+  val df = untreatedData.withColumn("label", when(col("label") === true, 1).otherwise(0))
+  //untreatedData.show()
+  //data.show()
+
+    val colnames = df.schema.fields.map(col=> col.name)
+
+    val indexers = colnames.map (
+      col => new StringIndexer()
+      .setInputCol(col)
+      .setOutputCol(col + "Index")
+      .setHandleInvalid("keep")
+    )
+
+    val encoders = colnames.map (
+      col => new OneHotEncoder()
+      .setInputCol(col + "Index")
+      .setOutputCol(col + "Encode")
+    )
+    val pipeline = new Pipeline().setStages(indexers ++ encoders)
+    val dfEncoded = pipeline.fit(df).transform(df)
+
+    val columnVectorialized = new VectorAssembler()
+      .setInputCols(Array("networkEncode","cityEncode","impidEncode","exchangeEncode","mediaEncode","osEncode","typeEncode"))
+      .setOutputCol("features")
+
+    val dataModel = columnVectorialized.transform(dfEncoded).select("networkEncode","cityEncode","impidEncode","exchangeEncode","mediaEncode","osEncode","typeEncode","label", "features")
+  
+  val lr = new LogisticRegression()
+  .setMaxIter(10)
+  .setRegParam(0.3)
+  .setElasticNetParam(0.8)
+
+  // Fit the model
+  val lrModel = lr.fit(dataModel)
+  // Print the coefficients and intercept for logistic regression
+  println(s"Coefficients: ${lrModel.coefficients} Intercept: ${lrModel.intercept}")
+
+
+  context.stop()
 }
