@@ -3,13 +3,17 @@ import org.apache.spark.ml.Pipeline
 import org.apache.spark.ml.feature.{StringIndexer,OneHotEncoder, VectorAssembler}
 import org.apache.spark.ml.classification.{LogisticRegression,BinaryLogisticRegressionSummary}
 import org.apache.spark.sql.functions.rand
-
+import org.apache.log4j.{Level, Logger}
 
 //Don't pay attention of red messages INFO (it's not an error)
 /**
   * The programm that predict if a user clicks on an or not
   */
-object Main extends App{
+object Main extends App {
+
+  // Disable logging
+  Logger.getLogger("org").setLevel(Level.OFF)
+  Logger.getLogger("akka").setLevel(Level.OFF)
 
   val context = SparkSession
     .builder()
@@ -20,7 +24,7 @@ object Main extends App{
 
   
   //Put your own path to the json file
-  val untreatedData = context.read.json("./src/resources/data-students.json").select("network","city","impid","exchange","media","os","type", "label")
+  val untreatedData = context.read.json("./data-students.json").select("network","city","impid","exchange","media","os","type", "label")
 
 
   val cleaner = new Cleaner()
