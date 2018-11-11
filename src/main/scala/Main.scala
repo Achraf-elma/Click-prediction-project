@@ -96,30 +96,8 @@ val df = untreatedData.withColumn("bidfloor", when(col("bidfloor").isNull, 3).ot
 
   //Add your variable inside the setInputCols by adding Encode after
   val columnVectorialized = new VectorAssembler()
-<<<<<<< HEAD
     .setInputCols(Array("appOrSiteEncode","networkEncode", "bidfloorEncode"))
     .setOutputCol("features")
-=======
-    .setInputCols(Array("appOrSiteEncode" /*networkEncode","cityEncode","impidEncode","exchangeEncode","mediaEncode","osEncode","typeEncode"*/))
-    .setOutputCol("features")
-
-  val dataModel = columnVectorialized.transform(dfEncoded).select("appOrSiteEncode", /*networkEncode","cityEncode","impidEncode","exchangeEncode","mediaEncode","osEncode","typeEncode",*/ "label", "features")
-
-  val lr = new LogisticRegression()
-    .setMaxIter(10)
-    .setRegParam(0.1)
-    .setElasticNetParam(0.1)
-
-  def splitDf(df: DataFrame) = {
-    val subsetLabelTrue = df.filter(col("label") === 1)
-    val subsetLabelFalse = df.filter(col("label") === 0)
-    val nTrain = df.count() * 0.7
-    val nTest = df.count() * 0.3
-    val training = subsetLabelTrue.orderBy(rand()).limit((nTrain * 0.5).toInt).union(subsetLabelFalse.orderBy(rand()).limit((nTrain * 0.5).toInt))
-    val test = subsetLabelTrue.orderBy(rand()).limit((nTest * 0.5).toInt).union(subsetLabelFalse.orderBy(rand()).limit((nTest * 0.5).toInt))
-    Array(training, test)
-  }
->>>>>>> 574baaff52b24c301eb1a187a4d9902117c621e5
 
   val dataModel = columnVectorialized.transform(dfEncoded).select("appOrSiteEncode","networkEncode", "bidfloorEncode", "label", "features")
 
@@ -130,7 +108,6 @@ val df = untreatedData.withColumn("bidfloor", when(col("bidfloor").isNull, 3).ot
     .setFeaturesCol("features")
     .setLabelCol("label")
 
-<<<<<<< HEAD
    val splitData = dataModel.randomSplit(Array(0.7, 0.3))
   var (trainingData, testData) = (splitData(0), splitData(1))
 
@@ -144,10 +121,6 @@ val df = untreatedData.withColumn("bidfloor", when(col("bidfloor").isNull, 3).ot
 
   val predictions = lrModel.transform(testData)
 
-=======
-  val predictions = lrModel.transform(splitData(1))
-
->>>>>>> 574baaff52b24c301eb1a187a4d9902117c621e5
   // Print the coefficients and intercept for logistic regression
   val trainingSummary = lrModel.summary
 
