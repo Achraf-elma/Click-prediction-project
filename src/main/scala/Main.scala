@@ -4,8 +4,6 @@ import org.apache.spark.ml.feature.{StringIndexer, OneHotEncoder, VectorAssemble
 import org.apache.spark.ml.classification.{LogisticRegression, BinaryLogisticRegressionSummary}
 import org.apache.spark.sql.functions.rand
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.functions.udf
-import scala.util.matching.Regex
 import org.apache.spark.sql.functions.{col, when}
 
 //Don't pay attention of red messages INFO (it's not an error)
@@ -28,40 +26,11 @@ object Main extends App {
 
   //Put your own path to the json file
   //select your variable to add and change inside the variable columnVectorialized and dataModel at the end of the code 
-  val untreatedData = context.read.json("./src/resources/data-students.json").select("appOrSite","network", "bidfloor", "label")
+  val untreatedData = context.read.json("./src/resources/data-students.json").select("appOrSite","network", "timestamp", "label")
 
-  val network = udf {(str: String) =>
-    val fr = new Regex("208-(.*)")
-    val can = new Regex("302-(.*)")
-    val es = new Regex("214-(.*)")
-    val tur = new Regex("286-(.*)")
-    val ger = new Regex("262-(.*)")
-
-    str match {
-    case fr(x) => "France"
-    case null | "Other" | "Unknown" => "Unknown"
-    case can(x) => "Canada"
-    case es(x) => "Espagne"
-    case tur(x) => "Turquie"
-    case ger(x) => "Allemagne"
-    case _ => "Unknown"
-    }
-  }
-
-  val bidfloor: Double => Int = x => x match {
-  case x if (x >= 0 && x < 2) => 1
-  case x if (x >= 2 && x < 4) => 3
-  case x if (x >= 4 && x < 6) => 5
-  case x if (x >= 4 && x < 6) => 7
-  case x if (x >= 4 && x < 6) => 9
-  case _ => 11  // catch-all
-}
-val groupUDF = udf(bidfloor)
-
-val df = untreatedData.withColumn("bidfloor", when(col("bidfloor").isNull, 3).otherwise(col("bidfloor")))
-.withColumn("bidfloor", groupUDF(col("bidfloor")))
-.withColumn("label", when(col("label") === true, 1).otherwise(0))
-.withColumn("network", network(untreatedData("network")))
+  val df = untreatedData.withColumn("label", when(col("label") === true, 1).otherwise(0))
+  .withColumn("network", Cleaner.udf_clean_network(untreatedData("network")))
+  .withColumn("timestamp", Cleaner.udf_clean_timestamp(untreatedData("timestamp")))
 
 
   //TODO: clean interests
@@ -96,10 +65,10 @@ val df = untreatedData.withColumn("bidfloor", when(col("bidfloor").isNull, 3).ot
 
   //Add your variable inside the setInputCols by adding Encode after
   val columnVectorialized = new VectorAssembler()
-    .setInputCols(Array("appOrSiteEncode","networkEncode", "bidfloorEncode"))
+    .setInputCols(Array("appOrSiteEncode","networkEncode", "timestampEncode"))
     .setOutputCol("features")
 
-  val dataModel = columnVectorialized.transform(dfEncoded).select("appOrSiteEncode","networkEncode", "bidfloorEncode", "label", "features")
+  val dataModel = columnVectorialized.transform(dfEncoded).select("appOrSiteEncode","networkEncode", "timestampEncode", "label", "features")
 
   val lr = new LogisticRegression()
     .setMaxIter(10)
@@ -108,7 +77,7 @@ val df = untreatedData.withColumn("bidfloor", when(col("bidfloor").isNull, 3).ot
     .setFeaturesCol("features")
     .setLabelCol("label")
 
-   val splitData = dataModel.randomSplit(Array(0.7, 0.3))
+  val splitData = dataModel.randomSplit(Array(0.7, 0.3))
   var (trainingData, testData) = (splitData(0), splitData(1))
 
   trainingData = trainingData.select("features", "label")

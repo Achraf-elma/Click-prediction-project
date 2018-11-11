@@ -1,5 +1,8 @@
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions.udf
+import scala.util.matching.Regex
+import java.util.Date
+import java.text.SimpleDateFormat
 
 case class Cleaner() {
 
@@ -57,5 +60,21 @@ def udf_clean_network = {
         case _ => "Unknown"
       }
     }
+  }
+
+  def udf_clean_timestamp = {
+    udf((col: String) => {
+      val ts = col.toInt * 1000L
+      val df = new SimpleDateFormat("HH")
+      val hour = df.format(ts)
+        
+      hour match{
+        case x if (x.toInt >= 0 && x.toInt <= 6) => "night"
+        case x if (x.toInt > 20) => "night"
+        case x if (x.toInt > 6 && x.toInt <= 12) => "morning"
+        case x if (x.toInt > 12 && x.toInt <= 20) => "afternoon"
+        case _ => "Other"
+      }
+    })
   }
 }
