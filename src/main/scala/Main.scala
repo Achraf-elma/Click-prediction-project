@@ -36,10 +36,13 @@ object Main extends App {
   // this is used to implicitly convert an RDD to a DataFrame.
   import org.apache.spark.sql.functions._
 
+  // Creating dataframe while converting label from boolean to binary
   val df = untreatedData.withColumn("label", when(col("label") === true, 1).otherwise(0))
 
+  // Fetching column labels
   val colnames = df.schema.fields.map(col => col.name)
 
+  // StringIndexer encodes a string column of labels to a column of label indices
   val indexers = colnames.map(
     col => new StringIndexer()
       .setInputCol(col)
@@ -47,6 +50,7 @@ object Main extends App {
       .setHandleInvalid("keep")
   )
 
+  // Using one-hot encoding for representing states with binary values having only one digit 1
   val encoders = colnames.map(
     col => new OneHotEncoder()
       .setInputCol(col + "Index")
