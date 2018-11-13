@@ -169,11 +169,12 @@ println("encided data done")
 
   val lr = new LogisticRegression()
     .setMaxIter(10)
-    .setRegParam(0.3)
-    .setElasticNetParam(0.8)
+    .setRegParam(0.1)
+    .setElasticNetParam(0.1)
     .setFeaturesCol("features")
     .setLabelCol("label")
 
+  //TODO Find a better way to split
   val splitData = dataModel.randomSplit(Array(0.7, 0.3))
   var (trainingData, testData) = (splitData(0), splitData(1))
 
