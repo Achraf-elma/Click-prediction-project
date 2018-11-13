@@ -113,7 +113,7 @@ object Main extends App {
       val dfIndexed = addColumnIndex(df)
       val interestDfIndexed = addColumnIndex(interestData)
 
-      recursiveJoinOnIndex(List(dfIndexed,interestDfIndexed)).drop("index").drop("user").drop("interests")
+      recursiveJoinOnIndex(List(dfIndexed,interestDfIndexed)).drop("index").drop("user").drop("interests").drop("[Other]")
 
   }
 
@@ -127,31 +127,34 @@ object Main extends App {
   import org.apache.spark.sql.functions._
 
   // Fetching column labels
-  val colnames = cleanData.schema.fields.map(col => col.name)
+  val colnames = cleanData.drop("label").schema.fields.map(col => col.name)
+  colnames.map(col => println(col))
 
   // StringIndexer encodes a string column of labels to a column of label indices
   val indexers = colnames.map(
     col => new StringIndexer()
       .setInputCol(col)
       .setOutputCol(col + "Index")
-      .setHandleInvalid("keep")
+      .setHandleInvalid("skip")
   )
 
   // Using one-hot encoding for representing states with binary values having only one digit 1
-  val encoders = colnames.map(
+  /*val encoders = colnames.map(
     col => new OneHotEncoder()
       .setInputCol(col + "Index")
       .setOutputCol(col + "Encode")
-  )
+  )*/
 
-  val pipeline = new Pipeline().setStages(indexers ++ encoders)
-  val dfEncoded = pipeline.fit(cleanData).transform(cleanData)
-
+  val pipeline = new Pipeline().setStages(indexers /*++ encoders*/)
   println("pipeline done")
+  val dfEncoded = pipeline.fit(cleanData).transform(cleanData)
+println("encided data done")
+  
 
-  val dfWithoutLabel = cleanData.drop("label")
-  val colnamesWithoutLabel = dfWithoutLabel.schema.fields.map(col => col.name)
-  val renamedEncoded = colnamesWithoutLabel.map(col => col + "Encode")
+  //val dfWithoutLabel = cleanData.drop("label")
+  //val colnamesWithoutLabel = dfWithoutLabel.schema.fields.map(col => col.name)
+  val renamedEncoded = colnames.map(col => col + "Index")
+
 
   
 
@@ -160,7 +163,7 @@ object Main extends App {
     .setInputCols(renamedEncoded)
     .setOutputCol("features")
 
-  val dataModel = columnVectorialized.transform(dfEncoded).select((renamedEncoded :+ "label" :+ "features").mkString(","))
+  val dataModel = columnVectorialized.transform(dfEncoded).select("label", "features")
 
   println("Vector assembler done")
 
