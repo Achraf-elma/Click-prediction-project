@@ -7,6 +7,8 @@ import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.functions.{col, when}
 
+import org.apache.spark.ml.evaluation.BinaryClassificationEvaluator
+
 import org.apache.spark.sql.types.{LongType, StructField, StructType}
 
 //Don't pay attention of red messages INFO (it's not an error)
@@ -19,6 +21,7 @@ object Main extends App {
   Logger.getLogger("org").setLevel(Level.OFF)
   Logger.getLogger("akka").setLevel(Level.OFF)*/
 
+
   val context = SparkSession
     .builder()
     .appName("Word count")
@@ -29,7 +32,7 @@ object Main extends App {
 
   //Put your own path to the json file
   //select your variable to add and change inside the variable columnVectorialized and dataModel at the end of the code 
-  val untreatedData = context.read.json("./src/resources/data-students.json").select("appOrSite","network", "timestamp", "user", "interests", "label")
+  val untreatedData = context.read.json("./src/resources/data-students.json").select("appOrSite", "type","network", "timestamp", "label")
 
   val df = untreatedData.withColumn("label", when(col("label") === true, 1).otherwise(0))
   .withColumn("network", Cleaner.udf_clean_network(untreatedData("network")))
@@ -117,7 +120,8 @@ object Main extends App {
 
   }
 
-  val cleanData = handleInterest(df)
+  //val cleanData = handleInterest(df)
+  val cleanData = df.drop("interests").drop("user")
   cleanData.show()
 
 
@@ -139,24 +143,18 @@ object Main extends App {
   )
 
   // Using one-hot encoding for representing states with binary values having only one digit 1
-  /*val encoders = colnames.map(
+  val encoders = colnames.map(
     col => new OneHotEncoder()
       .setInputCol(col + "Index")
       .setOutputCol(col + "Encode")
-  )*/
+  )
 
-  val pipeline = new Pipeline().setStages(indexers /*++ encoders*/)
+  val pipeline = new Pipeline().setStages(indexers ++ encoders)
   println("pipeline done")
   val dfEncoded = pipeline.fit(cleanData).transform(cleanData)
 println("encided data done")
   
-
-  //val dfWithoutLabel = cleanData.drop("label")
-  //val colnamesWithoutLabel = dfWithoutLabel.schema.fields.map(col => col.name)
-  val renamedEncoded = colnames.map(col => col + "Index")
-
-
-  
+  val renamedEncoded = colnames.map(col => col + "Encode")
 
   //Add your variable inside the setInputCols by adding Encode after
   val columnVectorialized = new VectorAssembler()
@@ -177,11 +175,8 @@ println("encided data done")
   //TODO Find a better way to split
   val splitData = dataModel.randomSplit(Array(0.7, 0.3))
   var (trainingData, testData) = (splitData(0), splitData(1))
-
   trainingData = trainingData.select("features", "label")
-  trainingData.groupBy("label").count.show()
   testData = testData.select("features", "label")
-  testData.groupBy("label").count.show()
 
   // Fit the model
   val lrModel = lr.fit(trainingData)
@@ -191,6 +186,14 @@ println("encided data done")
   val predictions = lrModel.transform(testData)
 
   println("predictions done")
+
+
+  /*val evaluator = new BinaryClassificationEvaluator()
+    .setMetricName("areaUnderROC")
+    .setRawPredictionCol("rawPrediction")
+    .setLabelCol("label")
+
+  println(evaluator.evaluate(predictions)+ " ********************")*/
 
   // Print the coefficients and intercept for logistic regression
   val trainingSummary = lrModel.summary
@@ -210,6 +213,7 @@ println("encided data done")
 
   println("objectiveHistory:")
   objectiveHistory.foreach(loss => println(loss))
+
 
   println(s"Coefficients: ${lrModel.coefficients} Intercept: ${lrModel.intercept}")
 
