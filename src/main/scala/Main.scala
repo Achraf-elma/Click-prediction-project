@@ -4,14 +4,24 @@ import org.apache.spark.ml.evaluation.BinaryClassificationEvaluator
 import org.apache.spark.ml.feature.{OneHotEncoderEstimator, StringIndexer, VectorAssembler}
 import org.apache.spark.sql.types.{LongType, StructField, StructType}
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
+import org.apache.spark.sql.functions.{explode, split, udf, when}
 
 /**
   * The programm that predict if a user clicks on an or not
   */
 
 
-object Test  {
-  
+object Test extends App  {
+
+  def udf_clean_size = {
+    udf {(s: Any) =>
+      s match {
+        case Array(x,y) => "[" + x.toString + "," + y.toString + "]";
+        case _ => "Other";
+      }
+    }
+  }
+
   val context = SparkSession
     .builder()
     .appName("Word count")
@@ -25,11 +35,11 @@ object Test  {
 
   //Put your own path to the json file
   //select your variable to add and change inside the variable columnVectorialized and dataModel at the end of the code
-  val untreatedData = context.read.json("./src/resources/data-students.json").select("size")
-  val sizeTreated = untreatedData.withColumn("BannerSize", Cleaner.udf_clean_size(untreatedData("size"))).select("BannerSize")
+  val untreatedData = context.read.json("./src/main/scala/data-students.json").select("size")
+  val sizeTreated = untreatedData.withColumn("size", udf_clean_size(untreatedData("size")))
   sizeTreated.show();
 }
-object Main extends App {
+object Main {
 
   val context = SparkSession
     .builder()
