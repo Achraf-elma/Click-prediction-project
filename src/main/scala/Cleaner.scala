@@ -163,7 +163,7 @@ def udf_clean_network = {
         /*case IAB27(x) => "IAB27"
         case IAB28(x) => "IAB28"
         case IAB29(x) => "IAB29"*/
-        case _ => "Other"
+        case _ => s
         //case _ => s
       }
     }

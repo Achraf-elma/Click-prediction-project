@@ -1,16 +1,9 @@
 import org.apache.spark.ml.Pipeline
-import org.apache.spark.sql.{DataFrame, Row, SparkSession}
-import org.apache.spark.ml.classification.{BinaryLogisticRegressionSummary, LogisticRegression}
-import org.apache.spark.ml.feature.{OneHotEncoderEstimator, StringIndexer, VectorAssembler}
-import org.apache.spark.sql.functions.{col, when}r, OneHotEncoder, VectorAssembler}
-import org.apache.spark.ml.classification.{LogisticRegression}
-import org.apache.spark.sql.functions.rand
-import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.functions._
-import org.apache.spark.sql.functions.{col, when}
+import org.apache.spark.ml.classification.LogisticRegression
 import org.apache.spark.ml.evaluation.BinaryClassificationEvaluator
-
+import org.apache.spark.ml.feature.{OneHotEncoderEstimator, StringIndexer, VectorAssembler}
 import org.apache.spark.sql.types.{LongType, StructField, StructType}
+import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 //Don't pay attention of red messages INFO (it's not an error)
 /**
   * The programm that predict if a user clicks on an or not
@@ -35,7 +28,7 @@ object Main extends App {
 
   //Put your own path to the json file
   //select your variable to add and change inside the variable columnVectorialized and dataModel at the end of the code
-  val untreatedData = context.read.json("./src/resources/data-students.json").select("appOrSite", "network", "type", "publisher", "label")
+  val untreatedData = context.read.json("./src/resources/data-students.json").select("appOrSite", "network", "type", "publisher", "label", "interests", "user")
 
 
   /*val bidfloor: Double => Int = x => x match {
@@ -139,8 +132,8 @@ object Main extends App {
 
   df.printSchema()
 
-  //val cleanData = handleInterest(df)
-  val cleanData = df.drop("interests").drop("user")
+  val cleanedInterests = handleInterest(df)
+  val cleanData = cleanedInterests.drop("user")
   cleanData.show()
 
   // Fetching column labels
