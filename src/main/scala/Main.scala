@@ -8,6 +8,27 @@ import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 /**
   * The programm that predict if a user clicks on an or not
   */
+
+
+object Test  {
+  
+  val context = SparkSession
+    .builder()
+    .appName("Word count")
+    .master("local")
+    .getOrCreate()
+
+  context.sparkContext.setLogLevel("WARN")
+
+  // this is used to implicitly convert an RDD to a DataFrame.
+  import org.apache.spark.sql.functions._
+
+  //Put your own path to the json file
+  //select your variable to add and change inside the variable columnVectorialized and dataModel at the end of the code
+  val untreatedData = context.read.json("./src/resources/data-students.json").select("size")
+  val sizeTreated = untreatedData.withColumn("BannerSize", Cleaner.udf_clean_size(untreatedData("size"))).select("BannerSize")
+  sizeTreated.show();
+}
 object Main extends App {
 
   val context = SparkSession

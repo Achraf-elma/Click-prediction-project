@@ -69,8 +69,8 @@ def udf_clean_network = {
  /* def udf_clean_size = {
     udf {(s: Array[Long]) =>
       s match {
-        case [x,y] => "[" + x + "," + y + "]";
-        case _ => "Other"
+        case Array(x,y) => "[" + x.toString + "," + y.toString + "]";
+        case _ => "Other";
       }
     }
   }*/
@@ -134,6 +134,13 @@ def udf_clean_network = {
     })
   }
 
+
+  def udf_renameInterestByRow = {
+     udf { (s: String) =>
+
+
+    }
+  }
    /**
  **udf to replace name of interests
  **/
