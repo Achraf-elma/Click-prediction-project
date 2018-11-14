@@ -11,9 +11,6 @@ import scala.util.matching.Regex
 case class Cleaner() {
 
 
-
-  
-
   def selectValueFromGivenCount(data: DataFrame, limit: String, column: String) = {
     data.groupBy(column).count()
       .filter("count "+limit)
@@ -71,7 +68,10 @@ def udf_clean_network = {
 
   def udf_clean_size = {
     udf {(s: Array[Long]) =>
-      s.mkString(",")
+      s match {
+        case [x,y] => "[" + x + "," + y + "]";
+        case _ => "Other"
+      }
     }
   }
 
