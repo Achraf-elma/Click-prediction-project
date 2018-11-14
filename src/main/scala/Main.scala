@@ -9,7 +9,8 @@ import org.apache.spark.sql.functions.{explode, split, udf, when}
 /**
   * The programm that predict if a user clicks on an or not
   */
-object Main extends App {
+
+object Main extends App{
 
   val context = SparkSession
     .builder()
@@ -23,7 +24,7 @@ object Main extends App {
   import org.apache.spark.sql.functions._
 
   //select your variable to add and change inside the variable columnVectorialized and dataModel at the end of the code
-  val untreatedData = context.read.json("./src/resources/data-students.json").select("appOrSite", "network", "type", "size", "exchange", "label")
+  val untreatedData = context.read.json("./src/resources/data-students.json").select("appOrSite", "network", "type", "publisher", "label", "interests", "user")
 
   val df = untreatedData.withColumn("label", when(col("label") === true, 1).otherwise(0))
     .withColumn("network", Cleaner.udf_clean_network(untreatedData("network")))

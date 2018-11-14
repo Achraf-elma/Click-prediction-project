@@ -144,7 +144,14 @@ object Cleaner{
   /**
     **udf to replace name of interests
     **/
-  def udf_renameI = {
+ 
+  def udf_renameInterestByRow =  udf { (s: String) => val array = s.split(",").map( x => udf_renameI(x)) }
+      
+
+   /**
+ **udf to replace name of interests
+ **/
+   def udf_renameI = {
     udf { (s: String) =>
       /*if(list.contains("["+s+"]")){
             defaultValue
