@@ -16,7 +16,7 @@ object Test extends App  {
   def udf_clean_size = {
     udf {(s: Any) =>
       s match {
-        case Array(x,y) => "[" + x.toString + "," + y.toString + "]";
+        case Array(a,b) => "[" + a.toString + "," + b.toString + "]"
         case _ => "Other";
       }
     }
@@ -36,8 +36,11 @@ object Test extends App  {
   //Put your own path to the json file
   //select your variable to add and change inside the variable columnVectorialized and dataModel at the end of the code
   val untreatedData = context.read.json("./src/main/scala/data-students.json").select("size")
-  val sizeTreated = untreatedData.withColumn("size", udf_clean_size(untreatedData("size")))
-  sizeTreated.show();
+ // val sizeTreated = untreatedData.mp
+  untreatedData.withColumn("size", udf_clean_size(untreatedData("size")))
+  untreatedData.map( data => data.mkString)
+  untreatedData.groupBy("size").count.show()
+  untreatedData.show()
 }
 object Main {
 
