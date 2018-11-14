@@ -1,12 +1,11 @@
 import org.apache.spark.sql.{DataFrame, SparkSession, Row}
 import org.apache.spark.ml.Pipeline
 import org.apache.spark.ml.feature.{StringIndexer, OneHotEncoder, VectorAssembler}
-import org.apache.spark.ml.classification.{LogisticRegression, BinaryLogisticRegressionSummary}
+import org.apache.spark.ml.classification.{LogisticRegression}
 import org.apache.spark.sql.functions.rand
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.functions.{col, when}
-
 import org.apache.spark.ml.evaluation.BinaryClassificationEvaluator
 
 import org.apache.spark.sql.types.{LongType, StructField, StructType}
@@ -30,13 +29,24 @@ object Main extends App {
 
   context.sparkContext.setLogLevel("WARN")
 
+  // this is used to implicitly convert an RDD to a DataFrame.
+  import org.apache.spark.sql.functions._
+
   //Put your own path to the json file
   //select your variable to add and change inside the variable columnVectorialized and dataModel at the end of the code 
-  val untreatedData = context.read.json("./src/resources/data-students.json").select("appOrSite", "type","network", "timestamp", "label")
+  val untreatedData = context.read.json("./src/resources/data-students.json").select("appOrSite", "network", "type", "publisher", "label")
 
-  val df = untreatedData.withColumn("label", when(col("label") === true, 1).otherwise(0))
-  .withColumn("network", Cleaner.udf_clean_network(untreatedData("network")))
-  .withColumn("timestamp", Cleaner.udf_clean_timestamp(untreatedData("timestamp")))
+
+  /*val bidfloor: Double => Int = x => x match {
+    case x if (x >= 0 && x < 2) => 1
+    case x if (x >= 2 && x < 4) => 3
+    case x if (x >= 4 && x < 6) => 5
+    case x if (x >= 6 && x < 8) => 7
+    case x if (x >= 8 && x < 9) => 9
+    case _ => 11  // catch-all
+  }
+  val groupUDF = udf(bidfloor)*/
+
 
   def handleInterest(data: DataFrame) : DataFrame = {
         //TODO: clean interests
@@ -120,15 +130,18 @@ object Main extends App {
 
   }
 
+  val df = untreatedData.withColumn("label", when(col("label") === true, 1).otherwise(0))
+  .withColumn("network", Cleaner.udf_clean_network(untreatedData("network")))
+  //.withColumn("timestamp", Cleaner.udf_clean_timestamp(untreatedData("timestamp")))
+  //.withColumn("size", Cleaner.udf_clean_size(untreatedData("size")))
+  //.withColumn("bidfloor", when(col("bidfloor").isNull, 3).otherwise(col("bidfloor")))
+  //.withColumn("bidfloor", groupUDF(col("bidfloor")))
+
+  df.printSchema()
+
   //val cleanData = handleInterest(df)
   val cleanData = df.drop("interests").drop("user")
   cleanData.show()
-
-
-
-
-  // this is used to implicitly convert an RDD to a DataFrame.
-  import org.apache.spark.sql.functions._
 
   // Fetching column labels
   val colnames = cleanData.drop("label").schema.fields.map(col => col.name)
@@ -152,7 +165,7 @@ object Main extends App {
   val pipeline = new Pipeline().setStages(indexers ++ encoders)
   println("pipeline done")
   val dfEncoded = pipeline.fit(cleanData).transform(cleanData)
-println("encided data done")
+  println("encoded data done")
   
   val renamedEncoded = colnames.map(col => col + "Encode")
 
@@ -167,8 +180,6 @@ println("encided data done")
 
   val lr = new LogisticRegression()
     .setMaxIter(10)
-    .setRegParam(0.1)
-    .setElasticNetParam(0.1)
     .setFeaturesCol("features")
     .setLabelCol("label")
 
@@ -185,37 +196,14 @@ println("encided data done")
 
   val predictions = lrModel.transform(testData)
 
-  println("predictions done")
-
-
-  /*val evaluator = new BinaryClassificationEvaluator()
+  println("prediction done")
+  
+  val evaluator = new BinaryClassificationEvaluator()
     .setMetricName("areaUnderROC")
     .setRawPredictionCol("rawPrediction")
     .setLabelCol("label")
 
-  println(evaluator.evaluate(predictions)+ " ********************")*/
-
-  // Print the coefficients and intercept for logistic regression
-  val trainingSummary = lrModel.summary
-
-  // Obtain the objective per iteration.
-  val objectiveHistory = trainingSummary.objectiveHistory
-
-  // Obtain the metrics useful to judge performance on test data.
-  // We cast the summary to a BinaryLogisticRegressionSummary since the problem is a
-  // binary classification problem.
-  val binarySummary = trainingSummary.asInstanceOf[BinaryLogisticRegressionSummary]
-
-  // Obtain the receiver-operating characteristic as a dataframe and areaUnderROC.
-  val roc = binarySummary.roc
-  roc.show()
-  println(s"areaUnderROC: ${binarySummary.areaUnderROC}")
-
-  println("objectiveHistory:")
-  objectiveHistory.foreach(loss => println(loss))
-
-
-  println(s"Coefficients: ${lrModel.coefficients} Intercept: ${lrModel.intercept}")
+  println(evaluator.evaluate(predictions) + " ************")
 
   context.stop()
 }

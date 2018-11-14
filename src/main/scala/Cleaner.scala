@@ -8,6 +8,10 @@ import java.text.SimpleDateFormat
 
 case class Cleaner() {
 
+
+
+  
+
   def selectValueFromGivenCount(data: DataFrame, limit: String, column: String) = {
     data.groupBy(column).count()
       .filter("count "+limit)
@@ -61,6 +65,14 @@ def udf_clean_network = {
       }
     }
   }
+
+
+  def udf_clean_size = {
+    udf {(s: Array[Long]) =>
+      s.mkString(",")
+    }
+  }
+
 
   def udf_clean_timestamp = {
     udf((col: String) => {
