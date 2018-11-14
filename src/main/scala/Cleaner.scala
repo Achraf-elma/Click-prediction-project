@@ -66,14 +66,14 @@ def udf_clean_network = {
   }
 
 
- /* def udf_clean_size = {
+ def udf_clean_size = {
     udf {(s: Array[Long]) =>
       s match {
         case Array(x,y) => "[" + x.toString + "," + y.toString + "]";
         case _ => "Other";
       }
     }
-  }*/
+  }
 
   def handleInterest(data: DataFrame) : List[DataFrame] = {
     //TODO: clean interests
