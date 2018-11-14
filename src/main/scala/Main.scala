@@ -1,14 +1,8 @@
-import org.apache.spark.sql.{DataFrame, SparkSession, Row}
 import org.apache.spark.ml.Pipeline
-import org.apache.spark.ml.feature.{StringIndexer, OneHotEncoder, VectorAssembler}
-import org.apache.spark.ml.classification.{LogisticRegression, BinaryLogisticRegressionSummary}
-import org.apache.spark.sql.functions.rand
-import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.functions._
+import org.apache.spark.ml.classification.{BinaryLogisticRegressionSummary, LogisticRegression}
+import org.apache.spark.ml.feature.{OneHotEncoderEstimator, StringIndexer, VectorAssembler}
+import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.{col, when}
-
-import org.apache.spark.sql.types.{LongType, StructField, StructType}
-
 //Don't pay attention of red messages INFO (it's not an error)
 /**
   * The programm that predict if a user clicks on an or not
@@ -35,96 +29,14 @@ object Main extends App {
   .withColumn("network", Cleaner.udf_clean_network(untreatedData("network")))
   .withColumn("timestamp", Cleaner.udf_clean_timestamp(untreatedData("timestamp")))
 
-  def handleInterest(data: DataFrame) : DataFrame = {
-        //TODO: clean interests
-      val renamedInterests= data.withColumn("listInterests", Cleaner.udf_renameI((data("interests")))).select("listInterests")
-      val updatedInterestsArray = renamedInterests.withColumn("uniqueInterests", explode(split(renamedInterests("listInterests"), ","))).select("uniqueInterests").distinct()
 
-      //identify the ones that are not well written
-      //val nonIAB = updateInterestsArray.distinct().where(not(updateInterestsArray("listInterests").contains("IAB"))).show()
-    
-      val arrayOfInterests =  updatedInterestsArray.withColumn("interestsArray", split(updatedInterestsArray("uniqueInterests"), ",")).select( "interestsArray").show()
+  val cleanData = Cleaner.handleInterest(df)
 
-      //var target = network.withColumn("interestsArray", split(network("interests"), ",")).select("user", "interestsArray", "interests")
-
-      var target = data.select("user", "interests")
-
-    //list of string that represents the list of renamed interests
-      val listOfUniqueInterest: List[String] = updatedInterestsArray.select("uniqueInterests").collect().map(row => row.toString()).toList
-
-    //trying to add column to a dataframe using foldLefst given a list of columns to add and a dataframe 
-    /*def addColumnsViaFold(df: DataFrame, columns: List[String]): DataFrame = {
-
-        /*def udf_check(list: List[String]): UserDefinedFunction = {
-          udf { (s: String) => {
-            if (list.contains(s+"-")) 1 else 0
-          }
-        }*/
-
-        columns.foldLeft(df)((acc, col) => {
-          acc.withColumn(col, acc("interestsArray")(0).contains(col)) //udf_check(List(acc("interestsArray").toString()))(col))
-        })
-      }
-
-        addColumnsViaFold(target, listOfUniqueInterest).show()*/
-
-      /*for(i <- 0 until listOfUniqueInterest.length-1) {
-        target.withColumn(listOfUniqueInterest(i), target("interests").contains(listOfUniqueInterest(i)))
-      }*/
-      //target.show()
-
-      //var df = target.select("user")
-    //result: a list of column that contains, for each user, either 1 if he/she is interested in the concerned interest(ie corresponds to the name of the column)
-      val l1 = listOfUniqueInterest.map(x => target.withColumn(x, when(target("interests").contains(x.substring(1, x.size-2))|| target("interests").contains(x.substring(1, x.size-3)), 1).otherwise(0)).select(x))
-      
-    //TODO: 3 steps left
-    //Step1: create a dataframe that contains each element of the list l1 as columns 
-
-    /**
-        * Add Column Index to dataframe
-        */
-      def addColumnIndex(df: DataFrame) = {
-        context.sqlContext.createDataFrame(
-          df.rdd.zipWithIndex.map {
-            case (row, index) => Row.fromSeq(row.toSeq :+ index)
-          },
-          // Create schema for index column
-          StructType(df.schema.fields :+ StructField("index", LongType, false)))
-      }
-
-      val interestDF = l1.map(col=>{
-        val df = col.toDF()
-        addColumnIndex(df)
-      })
-
-    def recursiveJoinOnIndex(list: List[DataFrame]): DataFrame = { 
-      if (list.isEmpty){ 
-        null 
-        }
-      else if(list.size >1){ 
-        list.head.join(recursiveJoinOnIndex(list.tail),"index") 
-        }
-        else {
-          list.head 
-        }
-    }
-      val interestData = recursiveJoinOnIndex(interestDF).drop("index")
-
-      val dfIndexed = addColumnIndex(df)
-      val interestDfIndexed = addColumnIndex(interestData)
-
-      recursiveJoinOnIndex(List(dfIndexed,interestDfIndexed)).drop("index").drop("user").drop("interests")
-
-  }
-
-  val cleanData = handleInterest(df)
-  cleanData.show()
 
 
 
 
   // this is used to implicitly convert an RDD to a DataFrame.
-  import org.apache.spark.sql.functions._
 
   // Fetching column labels
   val colnames = cleanData.schema.fields.map(col => col.name)
@@ -134,14 +46,14 @@ object Main extends App {
     col => new StringIndexer()
       .setInputCol(col)
       .setOutputCol(col + "Index")
-      .setHandleInvalid("keep")
+      .setHandleInvalid("skip")
   )
 
   // Using one-hot encoding for representing states with binary values having only one digit 1
   val encoders = colnames.map(
-    col => new OneHotEncoder()
-      .setInputCol(col + "Index")
-      .setOutputCol(col + "Encode")
+    col => new OneHotEncoderEstimator()
+      .setInputCols(Array(col + "Index"))
+      .setOutputCols(Array(col + "Encode"))
   )
 
   val pipeline = new Pipeline().setStages(indexers ++ encoders)

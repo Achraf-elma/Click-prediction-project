@@ -1,9 +1,11 @@
-import org.apache.spark.sql.{DataFrame, SparkSession, Row}
-import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.functions.udf
-import scala.util.matching.Regex
-import java.util.Date
 import java.text.SimpleDateFormat
+
+import Main.context
+import org.apache.spark.sql.functions.{explode, split, udf, when}
+import org.apache.spark.sql.types.{LongType, StructField, StructType}
+import org.apache.spark.sql.{DataFrame, Row}
+
+import scala.util.matching.Regex
 
 
 case class Cleaner() {
@@ -153,6 +155,94 @@ def udf_clean_network = {
         //case _ => s
       }
     }
+  }
+
+  def handleInterest(data: DataFrame) : DataFrame = {
+    //TODO: clean interests
+    val renamedInterests= data.withColumn("listInterests", Cleaner.udf_renameI((data("interests")))).select("listInterests")
+    val updatedInterestsArray = renamedInterests.withColumn("uniqueInterests", explode(split(renamedInterests("listInterests"), ","))).select("uniqueInterests").distinct()
+
+    //identify the ones that are not well written
+    //val nonIAB = updateInterestsArray.distinct().where(not(updateInterestsArray("listInterests").contains("IAB"))).show()
+
+    // val arrayOfInterests =  updatedInterestsArray.withColumn("interestsArray", split(updatedInterestsArray("uniqueInterests"), ",")).select( "interestsArray").show()
+
+    //var target = network.withColumn("interestsArray", split(network("interests"), ",")).select("user", "interestsArray", "interests")
+
+    var target = data.select("user", "interests")
+
+    //list of string that represents the list of renamed interests
+    val listOfUniqueInterest: List[String] = updatedInterestsArray.select("uniqueInterests").collect().map(row => row.toString()).toList
+
+    //result: a list of column that contains, for each user, either 1 if he/she is interested in the concerned interest(ie corresponds to the name of the column)
+    val l1 = listOfUniqueInterest.map(x => target.withColumn(x, when(target("interests").contains(x.substring(1, x.size-2))|| target("interests").contains(x.substring(1, x.size-3)), 1).otherwise(0)).select(x))
+
+    /*val l1 = l2.map(x => {
+      val indexer = new StringIndexer()
+        .setInputCol(x.toString())
+        .setOutputCol(x.toString()+"Index"))
+      val indexed = indexer.fit(x).transform(x)
+      indexed
+    })*/
+
+
+    //TODO: 3 steps left
+    //Step1: create a dataframe that contains each element of the list l1 as columns
+
+    /**
+      * Add Column Index to dataframe
+      */
+    def addColumnIndex(df: DataFrame) = {
+      context.sqlContext.createDataFrame(
+        df.rdd.zipWithIndex.map {
+          case (row, index) => Row.fromSeq(row.toSeq :+ index)
+        },
+        // Create schema for index column
+        StructType(df.schema.fields :+ StructField("index", LongType, false)))
+    }
+
+    val interestDF = l1.map(col=>{
+      val df = col.toDF()
+      addColumnIndex(df)
+    })
+
+    def recursiveJoinOnIndex(list: List[DataFrame]): DataFrame = {
+      if (list.isEmpty){
+        null
+      }
+      else if(list.size >1){
+        list.head.join(recursiveJoinOnIndex(list.tail),"index")
+      }
+      else {
+        list.head
+      }
+    }
+    val interestData = recursiveJoinOnIndex(interestDF).drop("index")
+
+    val dfIndexed = addColumnIndex(data)
+    val interestDfIndexed = addColumnIndex(interestData)
+
+
+
+    val cleanedData = recursiveJoinOnIndex(List(dfIndexed,interestDfIndexed)).drop("index").drop("user").drop("interests")
+    cleanedData
+    /*val arrayOfUniqueInterest: Array[String] = updatedInterestsArray.select("uniqueInterests").collect().map(row => row.toString())
+
+    //encode each column interest as a vector
+    val encoderI = new OneHotEncoderEstimator()
+      .setInputCols(arrayOfUniqueInterest)
+      .setOutputCols(arrayOfUniqueInterest.map(x => x+"Vec"))
+    val modelI = encoderI.fit(cleanedData)
+    val encodedI = modelI.transform(cleanedData)
+
+
+    //create a vectore that assembles all the interests
+    val assemblerI = new VectorAssembler()
+      .setInputCols(arrayOfUniqueInterest.map(x => x+"Vec"))
+      .setOutputCol("interestsVectorAssembler")
+
+    val ouputI = assemblerI.transform(encodedI)
+    ouputI*/
   }
 
   
