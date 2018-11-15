@@ -1,19 +1,19 @@
 import org.apache.spark.ml.Pipeline
 import org.apache.spark.ml.classification.LogisticRegression
 import org.apache.spark.ml.evaluation.BinaryClassificationEvaluator
-import org.apache.spark.ml.feature.{OneHotEncoderEstimator, StringIndexer, VectorAssembler}
+import org.apache.spark.ml.feature.{HashingTF, Tokenizer}
+import org.apache.spark.ml.linalg.Vector
+import org.apache.spark.ml.tuning.{CrossValidator, ParamGridBuilder}
+import org.apache.spark.ml.feature.{StringIndexer, OneHotEncoderEstimator, VectorAssembler}
 import org.apache.spark.sql.types.{LongType, StructField, StructType}
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
-//Don't pay attention of red messages INFO (it's not an error)
+import org.apache.spark.sql.functions.{explode, split, udf, when}
+
 /**
   * The programm that predict if a user clicks on an or not
   */
-object Main extends App {
 
-  /*// Disable logging
-  Logger.getLogger("org").setLevel(Level.OFF)
-  Logger.getLogger("akka").setLevel(Level.OFF)*/
-
+object Main extends App{
 
   val context = SparkSession
     .builder()
@@ -26,113 +26,20 @@ object Main extends App {
   // this is used to implicitly convert an RDD to a DataFrame.
   import org.apache.spark.sql.functions._
 
-  //Put your own path to the json file
   //select your variable to add and change inside the variable columnVectorialized and dataModel at the end of the code
-  val untreatedData = context.read.json("./src/resources/data-students.json").select("appOrSite", "network", "type", "publisher", "label", "interests", "user")
-
-
-  /*val bidfloor: Double => Int = x => x match {
-    case x if (x >= 0 && x < 2) => 1
-    case x if (x >= 2 && x < 4) => 3
-    case x if (x >= 4 && x < 6) => 5
-    case x if (x >= 6 && x < 8) => 7
-    case x if (x >= 8 && x < 9) => 9
-    case _ => 11  // catch-all
-  }
-  val groupUDF = udf(bidfloor)*/
-
-
-  def handleInterest(data: DataFrame) : DataFrame = {
-    //TODO: clean interests
-    val renamedInterests= data.withColumn("listInterests", Cleaner.udf_renameI((data("interests")))).select("listInterests")
-    val updatedInterestsArray = renamedInterests.withColumn("uniqueInterests", explode(split(renamedInterests("listInterests"), ","))).select("uniqueInterests").distinct()
-
-    //identify the ones that are not well written
-    //val nonIAB = updateInterestsArray.distinct().where(not(updateInterestsArray("listInterests").contains("IAB"))).show()
-
-    val arrayOfInterests =  updatedInterestsArray.withColumn("interestsArray", split(updatedInterestsArray("uniqueInterests"), ",")).select( "interestsArray").show()
-
-    //var target = network.withColumn("interestsArray", split(network("interests"), ",")).select("user", "interestsArray", "interests")
-
-    var target = data.select("user", "interests")
-
-    //list of string that represents the list of renamed interests
-    val listOfUniqueInterest: List[String] = updatedInterestsArray.select("uniqueInterests").collect().map(row => row.toString()).toList
-
-    //trying to add column to a dataframe using foldLefst given a list of columns to add and a dataframe
-    /*def addColumnsViaFold(df: DataFrame, columns: List[String]): DataFrame = {
-        /*def udf_check(list: List[String]): UserDefinedFunction = {
-          udf { (s: String) => {
-            if (list.contains(s+"-")) 1 else 0
-          }
-        }*/
-
-        columns.foldLeft(df)((acc, col) => {
-          acc.withColumn(col, acc("interestsArray")(0).contains(col)) //udf_check(List(acc("interestsArray").toString()))(col))
-        })
-      }
-
-        addColumnsViaFold(target, listOfUniqueInterest).show()*/
-
-    /*for(i <- 0 until listOfUniqueInterest.length-1) {
-      target.withColumn(listOfUniqueInterest(i), target("interests").contains(listOfUniqueInterest(i)))
-    }*/
-    //target.show()
-
-    //var df = target.select("user")
-    //result: a list of column that contains, for each user, either 1 if he/she is interested in the concerned interest(ie corresponds to the name of the column)
-    val l1 = listOfUniqueInterest.map(x => target.withColumn(x, when(target("interests").contains(x.substring(1, x.size-2))|| target("interests").contains(x.substring(1, x.size-3)), 1).otherwise(0)).select(x))
-
-    //TODO: 3 steps left
-    //Step1: create a dataframe that contains each element of the list l1 as columns
-
-    /**
-      * Add Column Index to dataframe
-      */
-    def addColumnIndex(df: DataFrame) = {
-      context.sqlContext.createDataFrame(
-        df.rdd.zipWithIndex.map {
-          case (row, index) => Row.fromSeq(row.toSeq :+ index)
-        },
-        // Create schema for index column
-        StructType(df.schema.fields :+ StructField("index", LongType, false)))
-    }
-
-    val interestDF = l1.map(col=>{
-      val df = col.toDF()
-      addColumnIndex(df)
-    })
-
-    def recursiveJoinOnIndex(list: List[DataFrame]): DataFrame = {
-      if (list.isEmpty){
-        null
-      }
-      else if(list.size >1){
-        list.head.join(recursiveJoinOnIndex(list.tail),"index")
-      }
-      else {
-        list.head
-      }
-    }
-    val interestData = recursiveJoinOnIndex(interestDF).drop("index")
-
-    val dfIndexed = addColumnIndex(df)
-    val interestDfIndexed = addColumnIndex(interestData)
-
-    recursiveJoinOnIndex(List(dfIndexed,interestDfIndexed)).drop("index").drop("user").drop("interests").drop("[Other]")
-
-  }
+  val untreatedData = context.read.json("./src/main/scala/data-students.json").select("appOrSite", "network", "type", "publisher","size", "label", "interests", "user")
 
   val df = untreatedData.withColumn("label", when(col("label") === true, 1).otherwise(0))
     .withColumn("network", Cleaner.udf_clean_network(untreatedData("network")))
-  //.withColumn("timestamp", Cleaner.udf_clean_timestamp(untreatedData("timestamp")))
-  //.withColumn("size", Cleaner.udf_clean_size(untreatedData("size")))
-  //.withColumn("bidfloor", when(col("bidfloor").isNull, 3).otherwise(col("bidfloor")))
-  //.withColumn("bidfloor", groupUDF(col("bidfloor")))
+    .withColumn("newSize", when(untreatedData("size").isNotNull,concat_ws(" ", untreatedData("size"))).otherwise("Unknown")).drop("size")
+
 
   df.printSchema()
 
-  val cleanedInterests = handleInterest(df)
+  df.groupBy("newSize").count.show()
+
+  val cleanedInterests = df.withColumn("interests",  when(df("interests").isNotNull, Cleaner.udf_renameInterestByRow(df("interests")
+                                                          )).otherwise("null"));
   val cleanData = cleanedInterests.drop("user")
   cleanData.show()
 
@@ -167,6 +74,8 @@ object Main extends App {
     .setInputCols(renamedEncoded)
     .setOutputCol("features")
 
+
+
   val dataModel = columnVectorialized.transform(dfEncoded).select("label", "features")
 
   println("Vector assembler done")
@@ -176,8 +85,10 @@ object Main extends App {
     .setFeaturesCol("features")
     .setLabelCol("label")
 
+  /*
   //TODO Find a better way to split
-  val splitData = dataModel.randomSplit(Array(0.7, 0.3))
+  val splitSeed = 5043
+  val splitData = dataModel.randomSplit(Array(0.7, 0.3),splitSeed)
   var (trainingData, testData) = (splitData(0), splitData(1))
   trainingData = trainingData.select("features", "label")
   testData = testData.select("features", "label")
@@ -197,6 +108,52 @@ object Main extends App {
     .setLabelCol("label")
 
   println(evaluator.evaluate(predictions) + " ************")
+  */
+
+  // Cross Validation
+  println("Cross Validation :")
+
+  // We use a ParamGridBuilder to construct a grid of parameters to search over.
+  val paramGrid = new ParamGridBuilder()
+    //.addGrid(hashingTF.numFeatures, Array(10, 100, 1000))
+    .addGrid(lr.regParam, Array(0.1, 0.01))
+    .build()
+
+  // We now treat the Logistic regression as an Estimator, wrapping it in a CrossValidator instance.
+  val cv = new CrossValidator()
+    .setEstimator(lr)
+    .setEvaluator(new BinaryClassificationEvaluator)
+    .setEstimatorParamMaps(paramGrid)
+    .setNumFolds(3)  // Use 3+ in practice
+
+  // Run cross-validation, and choose the best set of parameters.
+  val cvModel = cv.fit(dataModel)
+
+  val testData = dataModel.limit(100)
+
+  // Prediction
+  println("Predection with first 100 rows :")
+  testData.show()
+
+  // Make predictions on test documents. cvModel uses the best model found (lrModel).
+
+  val predictions = cvModel.transform(testData)
+
+  println("prediction done")
+
+  predictions
+    .select("features", "probability", "prediction")
+    .limit(20)
+    .collect()
+    .foreach { case Row(features: Vector, prob: Vector, prediction: Double) =>
+      println(s"($features) --> prob = $prob, prediction = $prediction")
+    }
+
+  println("evaluation")
+
+  val evaluator = cv.getEvaluator
+
+  println(evaluator.asInstanceOf[BinaryClassificationEvaluator].getMetricName + " : " + evaluator.evaluate(predictions) + " ************")
 
   context.stop()
 }

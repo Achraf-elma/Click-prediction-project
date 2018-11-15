@@ -38,7 +38,7 @@ object Cleaner{
     }}
   }
 
-def udf_clean_network = {
+  def udf_clean_network = {
     udf {(s: String) =>
       /*if(list.contains("["+s+"]")){
             defaultValue
@@ -66,6 +66,7 @@ def udf_clean_network = {
   }
 
 
+<<<<<<< HEAD
   /*def udf_clean_size = {
     udf {(s: Array[Long]) =>
       s match {
@@ -74,6 +75,58 @@ def udf_clean_network = {
       }
     }
   }*/
+=======
+  /* def udf_clean_size = {
+     udf {(s: Array[Long]) =>
+       s match {
+         case [x,y] => "[" + x + "," + y + "]";
+         case _ => "Other"
+       }
+     }
+   }*/
+
+  def handleInterest(data: DataFrame) : List[DataFrame] = {
+    //TODO: clean interests
+    val renamedInterests= data.withColumn("listInterests", Cleaner.udf_renameI((data("interests")))).select("listInterests")
+    val updatedInterestsArray = renamedInterests.withColumn("uniqueInterests", explode(split(renamedInterests("listInterests"), ","))).select("uniqueInterests").distinct()
+
+    //identify the ones that are not well written
+    //val nonIAB = updateInterestsArray.distinct().where(not(updateInterestsArray("listInterests").contains("IAB"))).show()
+
+    val arrayOfInterests =  updatedInterestsArray.withColumn("interestsArray", split(updatedInterestsArray("uniqueInterests"), ",")).select( "interestsArray").show()
+
+    //var target = network.withColumn("interestsArray", split(network("interests"), ",")).select("user", "interestsArray", "interests")
+
+    var target = data.select("user", "interests")
+
+    //list of string that represents the list of renamed interests
+    val listOfUniqueInterest: List[String] = updatedInterestsArray.select("uniqueInterests").collect().map(row => row.toString()).toList
+
+    //trying to add column to a dataframe using foldLefst given a list of columns to add and a dataframe
+    /*def addColumnsViaFold(df: DataFrame, columns: List[String]): DataFrame = {
+        /*def udf_check(list: List[String]): UserDefinedFunction = {
+          udf { (s: String) => {
+            if (list.contains(s+"-")) 1 else 0
+          }
+        }*/
+
+        columns.foldLeft(df)((acc, col) => {
+          acc.withColumn(col, acc("interestsArray")(0).contains(col)) //udf_check(List(acc("interestsArray").toString()))(col))
+        })
+      }
+
+        addColumnsViaFold(target, listOfUniqueInterest).show()*/
+
+    /*for(i <- 0 until listOfUniqueInterest.length-1) {
+      target.withColumn(listOfUniqueInterest(i), target("interests").contains(listOfUniqueInterest(i)))
+    }*/
+    //target.show()
+
+    //var df = target.select("user")
+    //result: a list of column that contains, for each user, either 1 if he/she is interested in the concerned interest(ie corresponds to the name of the column)
+    listOfUniqueInterest.map(x => target.withColumn(x, when(target("interests").contains(x.substring(1, x.size-2))|| target("interests").contains(x.substring(1, x.size-3)), 1).otherwise(0)).select(x))
+  }
+>>>>>>> d8ef74875a02b31e19682b2ebdaf1c426055a17d
 
 
   def udf_clean_timestamp = {
@@ -81,7 +134,7 @@ def udf_clean_network = {
       val ts = col.toInt * 1000L
       val df = new SimpleDateFormat("HH")
       val hour = df.format(ts)
-        
+
       hour match{
         case x if (x.toInt >= 0 && x.toInt <= 6) => "night"
         case x if (x.toInt > 20) => "night"
@@ -92,6 +145,27 @@ def udf_clean_network = {
     })
   }
 
+
+  /*def udf_clean_size = {
+    udf((col: Any) => {
+      col.toString.mkString
+    })
+  }*/
+
+  /**
+    **udf to replace name of interests
+    **/      
+
+  def udf_renameInterestByRow = { 
+  udf (
+    (s: String) => {
+        val regex = new Regex("-(.*)");
+        val arrayOfInterests = s.split(',')
+         .map(interest => regex.replaceAllIn(interest, "-")) 
+        arrayOfInterests.mkString(" ");
+      }
+    )
+  }
    /**
  **udf to replace name of interests
  **/
@@ -163,99 +237,15 @@ def udf_clean_network = {
         /*case IAB27(x) => "IAB27"
         case IAB28(x) => "IAB28"
         case IAB29(x) => "IAB29"*/
+<<<<<<< HEAD
         case _ => s+"-"
+=======
+        case _ => s + "-"
+>>>>>>> d8ef74875a02b31e19682b2ebdaf1c426055a17d
         //case _ => s
       }
     }
   }
 
-  def handleInterest(data: DataFrame) : DataFrame = {
-    //TODO: clean interests
-    val renamedInterests= data.withColumn("listInterests", Cleaner.udf_renameI((data("interests")))).select("listInterests")
-    val updatedInterestsArray = renamedInterests.withColumn("uniqueInterests", explode(split(renamedInterests("listInterests"), ","))).select("uniqueInterests").distinct()
 
-    //identify the ones that are not well written
-    //val nonIAB = updateInterestsArray.distinct().where(not(updateInterestsArray("listInterests").contains("IAB"))).show()
-
-    // val arrayOfInterests =  updatedInterestsArray.withColumn("interestsArray", split(updatedInterestsArray("uniqueInterests"), ",")).select( "interestsArray").show()
-
-    //var target = network.withColumn("interestsArray", split(network("interests"), ",")).select("user", "interestsArray", "interests")
-
-    var target = data.select("user", "interests")
-
-    //list of string that represents the list of renamed interests
-    val listOfUniqueInterest: List[String] = updatedInterestsArray.select("uniqueInterests").collect().map(row => row.toString()).toList
-
-    //result: a list of column that contains, for each user, either 1 if he/she is interested in the concerned interest(ie corresponds to the name of the column)
-    val l1 = listOfUniqueInterest.map(x => target.withColumn(x, when(target("interests").contains(x.substring(1, x.size-2))|| target("interests").contains(x.substring(1, x.size-3)), 1).otherwise(0)).select(x))
-
-    /*val l1 = l2.map(x => {
-      val indexer = new StringIndexer()
-        .setInputCol(x.toString())
-        .setOutputCol(x.toString()+"Index"))
-      val indexed = indexer.fit(x).transform(x)
-      indexed
-    })*/
-
-
-    //TODO: 3 steps left
-    //Step1: create a dataframe that contains each element of the list l1 as columns
-
-    /**
-      * Add Column Index to dataframe
-      */
-    def addColumnIndex(df: DataFrame) = {
-      context.sqlContext.createDataFrame(
-        df.rdd.zipWithIndex.map {
-          case (row, index) => Row.fromSeq(row.toSeq :+ index)
-        },
-        // Create schema for index column
-        StructType(df.schema.fields :+ StructField("index", LongType, false)))
-    }
-
-    val interestDF = l1.map(col=>{
-      val df = col.toDF()
-      addColumnIndex(df)
-    })
-
-    def recursiveJoinOnIndex(list: List[DataFrame]): DataFrame = {
-      if (list.isEmpty){
-        null
-      }
-      else if(list.size >1){
-        list.head.join(recursiveJoinOnIndex(list.tail),"index")
-      }
-      else {
-        list.head
-      }
-    }
-    val interestData = recursiveJoinOnIndex(interestDF).drop("index")
-
-    val dfIndexed = addColumnIndex(data)
-    val interestDfIndexed = addColumnIndex(interestData)
-
-
-
-    val cleanedData = recursiveJoinOnIndex(List(dfIndexed,interestDfIndexed)).drop("index").drop("user").drop("interests")
-    cleanedData
-    /*val arrayOfUniqueInterest: Array[String] = updatedInterestsArray.select("uniqueInterests").collect().map(row => row.toString())
-
-    //encode each column interest as a vector
-    val encoderI = new OneHotEncoderEstimator()
-      .setInputCols(arrayOfUniqueInterest)
-      .setOutputCols(arrayOfUniqueInterest.map(x => x+"Vec"))
-    val modelI = encoderI.fit(cleanedData)
-    val encodedI = modelI.transform(cleanedData)
-
-
-    //create a vectore that assembles all the interests
-    val assemblerI = new VectorAssembler()
-      .setInputCols(arrayOfUniqueInterest.map(x => x+"Vec"))
-      .setOutputCol("interestsVectorAssembler")
-
-    val ouputI = assemblerI.transform(encodedI)
-    ouputI*/
-  }
-
-  
 }
