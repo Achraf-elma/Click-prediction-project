@@ -13,6 +13,9 @@ Before running the project, please make sure you have the following installed on
 * Scala 2.11.x (2.11.8 is recommanded)
 * Spark 2.3.x (2.3.2 is recommanded)
 
+So that the model can learn from a dataset, please download the file "data-student.json" from https://drive.google.com/open?id=0B3dvASib_dtnQnd5NV9ORHdyamM . Then create a directory called "ressources" so that you will have store the file in the following path starting from your the root directory of the programm: ./src/resources/data-students.json
+Note that you have to call the file "data-student.json". Otherwise there would be no file from which the model would learn.
+
 Setting up the environnment  
 -
 * Download or clone the repository on branch master from : https://github.com/Mehdqtx/Click-prediction-project.git.
