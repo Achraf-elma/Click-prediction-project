@@ -35,7 +35,7 @@ object Main extends App{
 
   df.groupBy("newSize").count.show()
 
-  val cleanedInterests = df
+  val cleanedInterests = df.withColumn("Interest", Cleaner.udf_renameInterestByRow(df("interests")));
   val cleanData = cleanedInterests.drop("user")
   cleanData.show()
 
