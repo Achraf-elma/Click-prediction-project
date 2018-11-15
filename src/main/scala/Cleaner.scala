@@ -66,14 +66,14 @@ def udf_clean_network = {
   }
 
 
-  def udf_clean_size = {
+  /*def udf_clean_size = {
     udf {(s: Array[Long]) =>
       s match {
-        case [x,y] => "[" + x + "," + y + "]";
+        case [x,y] => "[" + x + "," + y + "]"
         case _ => "Other"
       }
     }
-  }
+  }*/
 
 
   def udf_clean_timestamp = {
@@ -163,7 +163,7 @@ def udf_clean_network = {
         /*case IAB27(x) => "IAB27"
         case IAB28(x) => "IAB28"
         case IAB29(x) => "IAB29"*/
-        case _ => s
+        case _ => s+"-"
         //case _ => s
       }
     }
