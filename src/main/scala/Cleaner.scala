@@ -1,9 +1,7 @@
 import java.text.SimpleDateFormat
 
-import Main.context
 import org.apache.spark.sql.functions.{explode, split, udf, when}
-import org.apache.spark.sql.types.{LongType, StructField, StructType}
-import org.apache.spark.sql.{DataFrame, Row}
+import org.apache.spark.sql.{DataFrame}
 
 import scala.util.matching.Regex
 

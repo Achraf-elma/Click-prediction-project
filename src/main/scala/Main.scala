@@ -1,14 +1,13 @@
 import org.apache.spark.ml.Pipeline
 import org.apache.spark.ml.classification.LogisticRegression
 import org.apache.spark.ml.evaluation.BinaryClassificationEvaluator
-import org.apache.spark.ml.feature.{HashingTF, Tokenizer}
 import org.apache.spark.ml.linalg.Vector
 import org.apache.spark.ml.tuning.{CrossValidator, ParamGridBuilder}
 import org.apache.spark.ml.feature.{StringIndexer, OneHotEncoderEstimator, VectorAssembler}
-import org.apache.spark.sql.types.{LongType, StructField, StructType}
-import org.apache.spark.sql.{DataFrame, Row, SparkSession}
-import org.apache.spark.sql.functions.{explode, split, udf, when}
+import org.apache.spark.sql.{Row, SparkSession}
 import org.apache.spark.sql.SaveMode
+import org.apache.spark.sql.{DataFrame}
+import org.apache.spark.sql.types.{LongType, StructField, StructType}
 
 /**
   * The programm that predict if a user clicks on an or not
@@ -28,7 +27,7 @@ object Main extends App{
   import org.apache.spark.sql.functions._
 
   //select your variable to add and change inside the variable columnVectorialized and dataModel at the end of the code
-  val untreatedData = context.read.json(args(0)).select("appOrSite", "network", "type", "publisher","size", "label", "interests", "user").limit(100)
+  val untreatedData = context.read.json(args(0)).select("appOrSite", "network", "type", "publisher","size", "label", "interests", "user")
 
   val df = untreatedData.withColumn("label", when(col("label") === true, 1).otherwise(0))
     .withColumn("network", Cleaner.udf_clean_network(untreatedData("network")))
@@ -79,37 +78,10 @@ object Main extends App{
 
   val dataModel = columnVectorialized.transform(dfEncoded).select("label", "features")
 
-  println("Vector assembler done")
-
   val lr = new LogisticRegression()
     .setMaxIter(10)
     .setFeaturesCol("features")
     .setLabelCol("label")
-
-  /*
-  //TODO Find a better way to split
-  val splitSeed = 5043
-  val splitData = dataModel.randomSplit(Array(0.7, 0.3),splitSeed)
-  var (trainingData, testData) = (splitData(0), splitData(1))
-  trainingData = trainingData.select("features", "label")
-  testData = testData.select("features", "label")
-
-  // Fit the model
-  val lrModel = lr.fit(trainingData)
-
-  println("lrModel done")
-
-  val predictions = lrModel.transform(testData)
-
-  println("prediction done")
-
-  val evaluator = new BinaryClassificationEvaluator()
-    .setMetricName("areaUnderROC")
-    .setRawPredictionCol("rawPrediction")
-    .setLabelCol("label")
-
-  println(evaluator.evaluate(predictions) + " ************")
-  */
 
   // Cross Validation
   println("Cross Validation :")
@@ -153,8 +125,6 @@ object Main extends App{
       println(s"($features) --> prob = $prob, prediction = $prediction")
     }
 
-  println("evaluation")
-
   val evaluator = cv.getEvaluator
 
   println(evaluator.asInstanceOf[BinaryClassificationEvaluator].getMetricName + " : " + evaluator.evaluate(predictions) + " ************")
@@ -164,6 +134,39 @@ object Main extends App{
 
 
 
+  /**
+    * Add Column Index to dataframe
+    */
+  def addColumnIndex(df: DataFrame) = {
+    context.sqlContext.createDataFrame(
+      df.rdd.zipWithIndex.map {
+        case (row, index) => Row.fromSeq(row.toSeq :+ index)
+      },
+      // Create schema for index column
+      StructType(df.schema.fields :+ StructField("index", LongType, false)))
+  }
+
+  def recursiveJoinOnIndex(list: List[DataFrame]): DataFrame = {
+    if (list.isEmpty){
+      null
+    }
+    else if(list.size >1){
+      list.head.join(recursiveJoinOnIndex(list.tail),"index")
+    }
+    else {
+      list.head
+    }
+  }
+
+  val predWithIndex = addColumnIndex(predictions.select("prediction"))
+  val untreadtedWithIndex = addColumnIndex(untreatedData)
+  val exportData = recursiveJoinOnIndex(List(predWithIndex,untreadtedWithIndex)).drop("index").drop("size")
+  exportData.coalesce(1)
+    .write.format("com.databricks.spark.csv")
+    .option("header", "true")
+    .mode(SaveMode.Overwrite)
+    .save("./predictedData.csv")
+  exportData.show()
+
   context.stop()
 }
-
