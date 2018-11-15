@@ -1,7 +1,10 @@
 import org.apache.spark.ml.Pipeline
 import org.apache.spark.ml.classification.LogisticRegression
 import org.apache.spark.ml.evaluation.BinaryClassificationEvaluator
-import org.apache.spark.ml.feature.{OneHotEncoderEstimator, StringIndexer, VectorAssembler}
+import org.apache.spark.ml.feature.{HashingTF, Tokenizer}
+import org.apache.spark.ml.linalg.Vector
+import org.apache.spark.ml.tuning.{CrossValidator, ParamGridBuilder}
+
 import org.apache.spark.sql.types.{LongType, StructField, StructType}
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 import org.apache.spark.sql.functions.{explode, split, udf, when}
@@ -82,6 +85,7 @@ object Main extends App{
     .setFeaturesCol("features")
     .setLabelCol("label")
 
+  /*
   //TODO Find a better way to split
   val splitData = dataModel.randomSplit(Array(0.7, 0.3))
   var (trainingData, testData) = (splitData(0), splitData(1))
@@ -103,6 +107,52 @@ object Main extends App{
     .setLabelCol("label")
 
   println(evaluator.evaluate(predictions) + " ************")
+  */
+
+  // Cross Validation
+  println("Cross Validation :")
+
+  // We use a ParamGridBuilder to construct a grid of parameters to search over.
+  val paramGrid = new ParamGridBuilder()
+    //.addGrid(hashingTF.numFeatures, Array(10, 100, 1000))
+    .addGrid(lr.regParam, Array(0.1, 0.01))
+    .build()
+
+  // We now treat the Logistic regression as an Estimator, wrapping it in a CrossValidator instance.
+  val cv = new CrossValidator()
+    .setEstimator(lr)
+    .setEvaluator(new BinaryClassificationEvaluator)
+    .setEstimatorParamMaps(paramGrid)
+    .setNumFolds(3)  // Use 3+ in practice
+
+  // Run cross-validation, and choose the best set of parameters.
+  val cvModel = cv.fit(dataModel)
+
+  val testData = dataModel.limit(100)
+
+  // Prediction
+  println("Predection with first 100 rows :")
+  testData.show()
+
+  // Make predictions on test documents. cvModel uses the best model found (lrModel).
+
+  val predictions = cvModel.transform(testData)
+
+  println("prediction done")
+
+  predictions
+    .select("features", "probability", "prediction")
+    .limit(20)
+    .collect()
+    .foreach { case Row(features: Vector, prob: Vector, prediction: Double) =>
+      println(s"($features) --> prob = $prob, prediction = $prediction")
+    }
+
+  println("evaluation")
+
+  val evaluator = cv.getEvaluator
+
+  println(evaluator.asInstanceOf[BinaryClassificationEvaluator].getMetricName + " : " + evaluator.evaluate(predictions) + " ************")
 
   context.stop()
 }
