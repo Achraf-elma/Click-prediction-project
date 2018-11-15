@@ -4,7 +4,7 @@ import org.apache.spark.ml.evaluation.BinaryClassificationEvaluator
 import org.apache.spark.ml.feature.{HashingTF, Tokenizer}
 import org.apache.spark.ml.linalg.Vector
 import org.apache.spark.ml.tuning.{CrossValidator, ParamGridBuilder}
-
+import org.apache.spark.ml.feature.{StringIndexer, OneHotEncoderEstimator, VectorAssembler}
 import org.apache.spark.sql.types.{LongType, StructField, StructType}
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 import org.apache.spark.sql.functions.{explode, split, udf, when}
@@ -38,7 +38,7 @@ object Main extends App{
 
   df.groupBy("newSize").count.show()
 
-  val cleanedInterests = df.withColumn("Interest",  when(df("interests").isNotNull, Cleaner.udf_renameInterestByRow(df("interests")
+  val cleanedInterests = df.withColumn("interests",  when(df("interests").isNotNull, Cleaner.udf_renameInterestByRow(df("interests")
                                                           )).otherwise("null"));
   val cleanData = cleanedInterests.drop("user")
   cleanData.show()
@@ -87,7 +87,8 @@ object Main extends App{
 
   /*
   //TODO Find a better way to split
-  val splitData = dataModel.randomSplit(Array(0.7, 0.3))
+  val splitSeed = 5043
+  val splitData = dataModel.randomSplit(Array(0.7, 0.3),splitSeed)
   var (trainingData, testData) = (splitData(0), splitData(1))
   trainingData = trainingData.select("features", "label")
   testData = testData.select("features", "label")
