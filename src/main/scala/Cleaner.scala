@@ -150,7 +150,7 @@ object Cleaner{
         val regex = new Regex("-(.*)");
         val arrayOfInterests = s.split(',')
          .map(interest => regex.replaceAllIn(interest, "-")) 
-        arrayOfInterests.mkString(' ');
+        arrayOfInterests.mkString(" ");
       }
     }
   }
