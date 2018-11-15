@@ -2,7 +2,7 @@
 
 This programm, given a json file, helps you predict if a user will click on an add or not. The json file must be in the same format as this file available here: https://drive.google.com/open?id=0B3dvASib_dtnQnd5NV9ORHdyamM
 
-:warning: Note that any modification on the source file 
+:warning: Note that any modification on the source file which is not on the master of this repository can affect the functionning of the program.
 
 Requirements
 - 
@@ -15,7 +15,7 @@ Before running the project, please make sure you have the following installed on
 
 Setting up the environnment  
 -
-* Download or clone the repository: https://github.com/Mehdqtx/Click-prediction-project.git.
+* Download or clone the repository on branch master from : https://github.com/Mehdqtx/Click-prediction-project.git.
 * Open the file.
 * Place yourself at the route directory inside de folder.
 * Compile the project using: 
