@@ -65,28 +65,7 @@ object Cleaner{
     }
   }
 
-
-<<<<<<< HEAD
-  /*def udf_clean_size = {
-    udf {(s: Array[Long]) =>
-      s match {
-        case [x,y] => "[" + x + "," + y + "]"
-        case _ => "Other"
-      }
-    }
-  }*/
-=======
-  /* def udf_clean_size = {
-     udf {(s: Array[Long]) =>
-       s match {
-         case [x,y] => "[" + x + "," + y + "]";
-         case _ => "Other"
-       }
-     }
-   }*/
-
   def handleInterest(data: DataFrame) : List[DataFrame] = {
-    //TODO: clean interests
     val renamedInterests= data.withColumn("listInterests", Cleaner.udf_renameI((data("interests")))).select("listInterests")
     val updatedInterestsArray = renamedInterests.withColumn("uniqueInterests", explode(split(renamedInterests("listInterests"), ","))).select("uniqueInterests").distinct()
 
@@ -126,7 +105,6 @@ object Cleaner{
     //result: a list of column that contains, for each user, either 1 if he/she is interested in the concerned interest(ie corresponds to the name of the column)
     listOfUniqueInterest.map(x => target.withColumn(x, when(target("interests").contains(x.substring(1, x.size-2))|| target("interests").contains(x.substring(1, x.size-3)), 1).otherwise(0)).select(x))
   }
->>>>>>> d8ef74875a02b31e19682b2ebdaf1c426055a17d
 
 
   def udf_clean_timestamp = {
@@ -171,12 +149,6 @@ object Cleaner{
  **/
    def udf_renameI = {
     udf { (s: String) =>
-      /*if(list.contains("["+s+"]")){
-            defaultValue
-          }
-          else{
-            s
-          }*/
       val IAB1 = new Regex("IAB1-(.*)")
       val IAB2 = new Regex("IAB2-(.*)")
       val IAB3 = new Regex("IAB3-(.*)")
@@ -234,15 +206,7 @@ object Cleaner{
         case IAB24(x) => "IAB24-"
         case IAB25(x) => "IAB25-"
         case IAB26(x) => "IAB26-"
-        /*case IAB27(x) => "IAB27"
-        case IAB28(x) => "IAB28"
-        case IAB29(x) => "IAB29"*/
-<<<<<<< HEAD
         case _ => s+"-"
-=======
-        case _ => s + "-"
->>>>>>> d8ef74875a02b31e19682b2ebdaf1c426055a17d
-        //case _ => s
       }
     }
   }

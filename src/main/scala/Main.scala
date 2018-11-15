@@ -8,6 +8,7 @@ import org.apache.spark.ml.feature.{StringIndexer, OneHotEncoderEstimator, Vecto
 import org.apache.spark.sql.types.{LongType, StructField, StructType}
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 import org.apache.spark.sql.functions.{explode, split, udf, when}
+import org.apache.spark.sql.SaveMode
 
 /**
   * The programm that predict if a user clicks on an or not
@@ -27,7 +28,7 @@ object Main extends App{
   import org.apache.spark.sql.functions._
 
   //select your variable to add and change inside the variable columnVectorialized and dataModel at the end of the code
-  val untreatedData = context.read.json("./src/resources/data-students.json").select("appOrSite", "network", "type", "publisher","size", "label", "interests", "user")
+  val untreatedData = context.read.json(args(0)).select("appOrSite", "network", "type", "publisher","size", "label", "interests", "user").limit(100)
 
   val df = untreatedData.withColumn("label", when(col("label") === true, 1).otherwise(0))
     .withColumn("network", Cleaner.udf_clean_network(untreatedData("network")))
@@ -129,6 +130,9 @@ object Main extends App{
   // Run cross-validation, and choose the best set of parameters.
   val cvModel = cv.fit(dataModel)
 
+  cvModel.write.overwrite().save("model")
+  println("Model created & saved")
+
   val testData = dataModel.limit(100)
 
   // Prediction
@@ -155,5 +159,11 @@ object Main extends App{
 
   println(evaluator.asInstanceOf[BinaryClassificationEvaluator].getMetricName + " : " + evaluator.evaluate(predictions) + " ************")
 
+
+  predictions.show()
+
+
+
   context.stop()
 }
+
