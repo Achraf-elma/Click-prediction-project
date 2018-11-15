@@ -27,7 +27,7 @@ object Main extends App{
   import org.apache.spark.sql.functions._
 
   //select your variable to add and change inside the variable columnVectorialized and dataModel at the end of the code
-  val untreatedData = context.read.json(args(0)).select("appOrSite", "network", "type", "publisher","size", "label", "interests", "user")
+  val untreatedData = context.read.json(args(0)).select("appOrSite", "network", "type", "publisher","size", "label", "interests", "user").limit(10)
 
   val df = untreatedData.withColumn("label", when(col("label") === true, 1).otherwise(0))
     .withColumn("network", Cleaner.udf_clean_network(untreatedData("network")))
@@ -134,39 +134,6 @@ object Main extends App{
 
 
 
-  /**
-    * Add Column Index to dataframe
-    */
-  def addColumnIndex(df: DataFrame) = {
-    context.sqlContext.createDataFrame(
-      df.rdd.zipWithIndex.map {
-        case (row, index) => Row.fromSeq(row.toSeq :+ index)
-      },
-      // Create schema for index column
-      StructType(df.schema.fields :+ StructField("index", LongType, false)))
-  }
-
-  def recursiveJoinOnIndex(list: List[DataFrame]): DataFrame = {
-    if (list.isEmpty){
-      null
-    }
-    else if(list.size >1){
-      list.head.join(recursiveJoinOnIndex(list.tail),"index")
-    }
-    else {
-      list.head
-    }
-  }
-
-  val predWithIndex = addColumnIndex(predictions.select("prediction"))
-  val untreadtedWithIndex = addColumnIndex(untreatedData)
-  val exportData = recursiveJoinOnIndex(List(predWithIndex,untreadtedWithIndex)).drop("index").drop("size")
-  exportData.coalesce(1)
-    .write.format("com.databricks.spark.csv")
-    .option("header", "true")
-    .mode(SaveMode.Overwrite)
-    .save("./predictedData.csv")
-  exportData.show()
 
   context.stop()
 }
