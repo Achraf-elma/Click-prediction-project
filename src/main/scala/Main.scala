@@ -4,45 +4,11 @@ import org.apache.spark.ml.evaluation.BinaryClassificationEvaluator
 import org.apache.spark.ml.feature.{OneHotEncoderEstimator, StringIndexer, VectorAssembler}
 import org.apache.spark.sql.types.{LongType, StructField, StructType}
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
-import org.apache.spark.sql.functions.{explode, split, udf, when}
 
 /**
   * The programm that predict if a user clicks on an or not
   */
-
-
-object Test extends App  {
-
-  def udf_clean_size = {
-    udf {(s: Any) =>
-      s match {
-        case Array(a,b) => "[" + a.toString + "," + b.toString + "]"
-        case _ => "Other";
-      }
-    }
-  }
-
-  val context = SparkSession
-    .builder()
-    .appName("Word count")
-    .master("local")
-    .getOrCreate()
-
-  context.sparkContext.setLogLevel("WARN")
-
-  // this is used to implicitly convert an RDD to a DataFrame.
-  import org.apache.spark.sql.functions._
-
-  //Put your own path to the json file
-  //select your variable to add and change inside the variable columnVectorialized and dataModel at the end of the code
-  val untreatedData = context.read.json("./src/main/scala/data-students.json").select("size")
- // val sizeTreated = untreatedData.mp
-  untreatedData.withColumn("size", udf_clean_size(untreatedData("size")))
-  untreatedData.map( data => data.mkString)
-  untreatedData.groupBy("size").count.show()
-  untreatedData.show()
-}
-object Main {
+object Main extends App {
 
   val context = SparkSession
     .builder()
@@ -56,12 +22,16 @@ object Main {
   import org.apache.spark.sql.functions._
 
   //select your variable to add and change inside the variable columnVectorialized and dataModel at the end of the code
-  val untreatedData = context.read.json("./src/resources/data-students.json").select("appOrSite", "network", "type", "publisher", "label", "interests", "user")
+  val untreatedData = context.read.json("./src/resources/data-students.json").select("appOrSite", "network", "type", "size", "exchange", "label")
 
   val df = untreatedData.withColumn("label", when(col("label") === true, 1).otherwise(0))
     .withColumn("network", Cleaner.udf_clean_network(untreatedData("network")))
+    .withColumn("newSize", when(untreatedData("size").isNotNull,concat_ws(" ", untreatedData("size"))).otherwise("Unknown")).drop("size")
+
 
   df.printSchema()
+
+  df.groupBy("newSize").count.show()
 
   val cleanedInterests = df
   val cleanData = cleanedInterests.drop("user")
@@ -97,6 +67,8 @@ object Main {
   val columnVectorialized = new VectorAssembler()
     .setInputCols(renamedEncoded)
     .setOutputCol("features")
+
+
 
   val dataModel = columnVectorialized.transform(dfEncoded).select("label", "features")
 

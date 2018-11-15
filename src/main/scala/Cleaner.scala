@@ -38,7 +38,7 @@ object Cleaner{
     }}
   }
 
-def udf_clean_network = {
+  def udf_clean_network = {
     udf {(s: String) =>
       /*if(list.contains("["+s+"]")){
             defaultValue
@@ -66,14 +66,14 @@ def udf_clean_network = {
   }
 
 
- /* def udf_clean_size = {
-    udf {(s: Array[Long]) =>
-      s match {
-        case Array(x,y) => "[" + x.toString + "," + y.toString + "]";
-        case _ => "Other";
-      }
-    }
-  }*/
+  /* def udf_clean_size = {
+     udf {(s: Array[Long]) =>
+       s match {
+         case [x,y] => "[" + x + "," + y + "]";
+         case _ => "Other"
+       }
+     }
+   }*/
 
   def handleInterest(data: DataFrame) : List[DataFrame] = {
     //TODO: clean interests
@@ -123,7 +123,7 @@ def udf_clean_network = {
       val ts = col.toInt * 1000L
       val df = new SimpleDateFormat("HH")
       val hour = df.format(ts)
-        
+
       hour match{
         case x if (x.toInt >= 0 && x.toInt <= 6) => "night"
         case x if (x.toInt > 20) => "night"
@@ -135,16 +135,16 @@ def udf_clean_network = {
   }
 
 
-  def udf_renameInterestByRow = {
-     udf { (s: String) =>
+  /*def udf_clean_size = {
+    udf((col: Any) => {
+      col.toString.mkString
+    })
+  }*/
 
-
-    }
-  }
-   /**
- **udf to replace name of interests
- **/
-   def udf_renameI = {
+  /**
+    **udf to replace name of interests
+    **/
+  def udf_renameI = {
     udf { (s: String) =>
       /*if(list.contains("["+s+"]")){
             defaultValue
@@ -212,11 +212,11 @@ def udf_clean_network = {
         /*case IAB27(x) => "IAB27"
         case IAB28(x) => "IAB28"
         case IAB29(x) => "IAB29"*/
-        case _ => s
+        case _ => s + "-"
         //case _ => s
       }
     }
   }
 
-  
+
 }
