@@ -145,14 +145,15 @@ object Cleaner{
     **udf to replace name of interests
     **/      
 
-  def udf_renameInterestByRow = { udf { 
+  def udf_renameInterestByRow = { 
+  udf (
     (s: String) => {
         val regex = new Regex("-(.*)");
         val arrayOfInterests = s.split(',')
          .map(interest => regex.replaceAllIn(interest, "-")) 
         arrayOfInterests.mkString(" ");
       }
-    }
+    )
   }
    /**
  **udf to replace name of interests
